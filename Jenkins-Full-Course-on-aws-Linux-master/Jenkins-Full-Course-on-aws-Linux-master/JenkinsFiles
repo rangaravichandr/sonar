@@ -1,0 +1,37 @@
+pipeline{
+    agent any
+    tools{
+        maven 'maven3'
+    }
+        stages{
+            stage("sonartest"){
+                steps{
+                    withSonarQubeEnv('sonarQube') {
+       sh 'mvn -f Maven/pom.xml clean install package sonar:sonar'
+}
+                }
+            }
+
+stage("ho"){
+    steps{
+        withSonarQubeEnv('bae0ce70-1532-40b2-8160-badf84a969fb') {
+              sh 'mvn -f Maven/pom.xml clean install package sonar:sonar'
+    // some block
+}
+    }
+}
+     stage("Quality Gate") {
+            steps {
+                 
+                
+                    // Parameter indicates whether to set pipeline to UNSTABLE if Quality Gate fails
+                    // true = set pipeline to UNSTABLE, false = don't
+                    waitForQualityGate abortPipeline: false, credentialsId: 'dbea9041c52c19055b7183fde987029abb0efeb9'
+                
+           
+                
+        }
+        }
+    
+}
+}

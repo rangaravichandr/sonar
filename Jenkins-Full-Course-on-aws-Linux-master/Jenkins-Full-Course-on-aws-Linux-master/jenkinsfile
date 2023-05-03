@@ -1,0 +1,143 @@
+pipeline{
+    agent any
+
+////////////////////////////////////////////////////////
+tools{
+'maven' 'maven3'
+'hudson.plugins.sonar.MsBuildSQRunnerInstallation' 'sonarQube'
+
+}
+
+/////////////////////////////////////////////////////////
+    stages{
+
+// //////////////////////GIT checkout stage ///////////////////////
+        stage('GIT CHECKOUT'){
+            steps{
+                git 'https://github.com/Divyabd/Jenkins-Full-Course-on-aws-Linux.git'
+            }
+        }
+
+
+ /////////////////////Maven build stage /////////////////////////
+        stage('Maven clean'){
+            steps{
+                sh 'mvn -version'
+                sh 'mvn -f Maven/pom.xml clean install'
+                sh 'mvn -f Maven/pom.xml install package'
+            }
+        }
+
+
+//////////////////// Sonarqube intregration stage ///////////////////
+// Link : https://docs.sonarqube.org/latest/analysis/scan/sonarscanner-for-jenkins/
+
+        stage("SonarQube intergration"){
+            steps{
+                withCredentials([string(credentialsId: 'jenkins-sonarqube', variable: '')]) {
+                sh 'mvn -f Maven/pom.xml clean install package sonar:sonar'
+            }
+
+            }
+         
+        }
+
+// Jfrog artifactory stage 
+
+//          stage("conning to jfrog artifactory"){
+//             steps{
+
+                   
+// rtServer (
+//     id: 'Artifactory-1',
+//     url: 'http://my-artifactory-domain/artifactory',
+//     // If you're using username and password:
+//     username: 'admin',
+//     password: 'Divya@1998',
+//     // If you're using Credentials ID:
+//     //credentialsId: 'ccrreeddeennttiiaall',
+//     // If Jenkins is configured to use an http proxy, you can bypass the proxy when using this Artifactory server:
+//     bypassProxy: true,
+//     // Configure the connection timeout (in seconds).
+//     // The default value (if not configured) is 300 seconds:
+//     timeout: 300
+// )
+//             }
+
+//        }
+
+/////////////////////////////// Uploading the  executable file to artifactory /////////////////////////
+// Link https://www.jfrog.com/confluence/display/JFROG/Declarative+Pipeline+Syntax
+
+       stage("uploading the file to artifact"){
+        steps{
+            rtUpload (
+              serverId: 'Jenkins-jfrog',
+                spec: '''{
+           "files": [
+            {
+              "pattern": "Maven/target/*.jar",
+              "target": "libs-snapshot-local/com/devopspract/DevopsMaven/1.0-SNAPSHOT/"
+            }
+             ]
+          }''',
+ 
+)
+        }
+       }
+
+//////////////////// PUBLISh ARTIFACTS TO ARTIFACTORY //////////////////////////////////////
+       stage("publish artifacts to artifactory "){
+              steps{
+    
+                  rtPublishBuildInfo (
+                     serverId: 'Jenkins-jfrog',
+                   )
+               }
+       }
+
+
+//////////////////// TERRAFORM INIT ////////////////////////////////////////////////
+       stage("Terraform init"){
+       steps{
+         sh 'terraform -chdir=Terraform init'
+
+       }
+       }
+
+       //////////////////// TERRAFORM plan////////////////////////////////////////////////
+       stage("Terraform plan"){
+       steps{
+         sh 'terraform -chdir=Terraform plan'
+         
+       }
+       }
+
+//////////////////// TERRAFORM  aplly////////////////////////////////////////////////
+     stage("Terraform apply"){
+       steps{
+         sh 'terraform -chdir=Terraform apply -auto-approve'
+         
+       }
+       }
+       
+
+// stage(" terraform destroy"){
+//     steps{
+//         sh 'terraform -chdir=Terraform destroy -auto-approve'
+//     }
+// }
+
+// /////////////////////Artifactory stage //////////////////////////////////////////////
+stage("s3 artifacts"){
+  steps{
+    s3Upload consoleLogLevel: 'INFO', dontSetBuildResultOnFailure: false, dontWaitForConcurrentBuildCompletion: false, entries: [[bucket: 'mybucketdivyademo12', excludedFile: '', flatten: false, gzipFiles: false, keepForever: false, managedArtifacts: false, noUploadOnFailure: false, selectedRegion: 'us-east-1', showDirectlyInBrowser: false, sourceFile: '**/*/*.jar', storageClass: 'STANDARD', uploadFromSlave: false, useServerSideEncryption: false]], pluginFailureResultConstraint: 'FAILURE', profileName: 'aws s3', userMetadata: []
+  }
+}
+
+
+
+    }
+
+    
+}
